@@ -66,6 +66,7 @@ def train(n_estimators: int, max_depth: int, learning_rate: float, sample_size: 
             registered_model_name="fraud-model",
             input_example=X_train.iloc[:5],
         )
+        mlflow.log_dict({"feature_columns": list(X_train.columns)}, "feature_columns.json")
 
         print(f"run_id={run.info.run_id}")
         print(f"train: {train_metrics}")
