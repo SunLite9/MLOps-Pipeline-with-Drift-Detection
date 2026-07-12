@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Skill files
+SKILL.md
+
+# Data (large, not committed)
+Bank Account Fraud Dataset Suite (NeurIPS 2022)/
+data/raw/
+data/processed/
+
+# MLflow
+mlruns/
+mlartifacts/
+mlflow.db
+mlflow_store/
+mlflow_server.log
+
+# Airflow
+docker/airflow/logs/
+docker/airflow/plugins/
+docker/airflow/.env
+
+# Env / secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
