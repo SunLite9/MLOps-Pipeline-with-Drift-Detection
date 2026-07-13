@@ -222,4 +222,4 @@ Everything currently runs locally:
 
 ## Contributing and license
 
-Personal portfolio project — not currently accepting external contributions. No license has been set; treat as all-rights-reserved unless a `LICENSE` file is added.
+This is a personal/portfolio project; no formal contribution process is set up. Licensed under the MIT License.
