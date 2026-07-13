@@ -1,4 +1,4 @@
-# Fraud Detection MLOps Pipeline
+# MLOps Pipeline with Drift Detection
 
 A closed-loop MLOps system that trains a fraud classifier, serves it as an API, watches live traffic for drift, and automatically retrains and redeploys itself when the data shifts — with a promotion gate that only lets genuinely better models into production.
 

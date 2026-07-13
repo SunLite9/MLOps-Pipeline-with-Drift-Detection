@@ -1,4 +1,4 @@
-# Fraud Detection MLOps Pipeline — Design Document
+# MLOps Pipeline with Drift Detection — Design Document
 
 A closed-loop MLOps system built around a deliberately simple fraud classifier: tracked training, a gated model registry, containerized serving, PSI-based drift detection that automatically triggers retraining, and CI/CD — the full production lifecycle around a model, not the model itself.
 
