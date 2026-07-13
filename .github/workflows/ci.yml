@@ -22,6 +22,32 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v
 
+  validate-dags:
+    name: Validate Airflow DAGs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Only Airflow itself is needed here: both DAG files import src/*
+      # modules lazily inside each task's function body (not at module
+      # top-level), specifically so DAG *parsing* never needs xgboost,
+      # mlflow, or any of the heavier training/serving dependencies.
+      - name: Install Airflow
+        run: |
+          pip install "apache-airflow==2.9.3" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.3/constraints-3.11.txt"
+
+      - name: Check DAGs import without errors
+        run: |
+          for f in dags/*.py; do
+            echo "Validating $f"
+            python "$f"
+          done
+
   build-serving-image:
     name: Build serving Docker image
     runs-on: ubuntu-latest

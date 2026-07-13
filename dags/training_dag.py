@@ -62,6 +62,13 @@ def training_dag():
         return evaluate_model(mlflow_run_id, paths)
 
     @task
+    def evaluate_test(mlflow_run_id: str, paths: dict):
+        from src.training.pipeline import evaluate_test_set
+
+        # Reporting only — never feeds the promotion decision.
+        return evaluate_test_set(mlflow_run_id, paths)
+
+    @task
     def register(mlflow_run_id: str, metric: float):
         from src.training.promotion import register_if_better
 

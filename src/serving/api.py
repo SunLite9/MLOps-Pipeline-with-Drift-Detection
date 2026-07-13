@@ -145,9 +145,21 @@ def reload_if_new_version() -> bool:
     return True
 
 
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(PREDICTION_LOG_DB)
+    # SQLite's default rollback-journal mode serializes writers: under
+    # concurrent /predict requests this produced real "database is locked"
+    # failures in load testing (scripts/load_test.py). WAL mode lets readers
+    # and a writer proceed concurrently; busy_timeout makes any remaining
+    # contention retry briefly instead of failing immediately.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    return conn
+
+
 def _init_log_db():
     PREDICTION_LOG_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(PREDICTION_LOG_DB)
+    conn = _connect()
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS predictions (
@@ -170,7 +182,7 @@ def _init_log_db():
 
 
 def _log_prediction(model_version: str, input_dict: dict, proba: float, pred: int, latency_ms: float):
-    conn = sqlite3.connect(PREDICTION_LOG_DB)
+    conn = _connect()
     conn.execute(
         "INSERT INTO predictions (timestamp, model_version, input_json, fraud_probability, fraud_prediction, latency_ms) "
         "VALUES (?, ?, ?, ?, ?, ?)",

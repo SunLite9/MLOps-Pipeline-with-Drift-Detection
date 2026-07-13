@@ -178,3 +178,30 @@ def evaluate_model(run_id: str, paths: dict) -> float:
         client.log_metric(run_id, k, v)
 
     return metrics[PRIMARY_METRIC]
+
+
+def evaluate_test_set(run_id: str, paths: dict) -> dict:
+    """Final holdout evaluation on the month-7 test split, logged to the run
+    purely for reporting. Deliberately never fed into register_if_better() —
+    the promotion decision is made on val_pr_auc alone, so the held-out test
+    set stays an honest, unused-until-now check on generalization rather
+    than a second metric the gate could implicitly be tuned against."""
+    mlflow.set_tracking_uri(_tracking_uri())
+
+    model = mlflow.xgboost.load_model(f"runs:/{run_id}/model")
+
+    test_df = pd.read_parquet(paths["test"])
+    y_test = test_df.pop(TARGET_COL)
+    X_test = test_df
+
+    proba = model.predict_proba(X_test)[:, 1]
+    metrics = {
+        "test_roc_auc": roc_auc_score(y_test, proba),
+        "test_pr_auc": average_precision_score(y_test, proba),
+    }
+
+    client = MlflowClient()
+    for k, v in metrics.items():
+        client.log_metric(run_id, k, v)
+
+    return metrics
