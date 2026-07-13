@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+# tests/ has no __init__.py, so bare `pytest` (as opposed to `python -m
+# pytest`, which implicitly prepends the current working directory to
+# sys.path) inserts tests/ itself onto sys.path rather than the project
+# root — breaking `from src...` imports in any test file that does that at
+# module level. This makes the project root explicit regardless of how
+# pytest is invoked.
+pythonpath = ["."]
