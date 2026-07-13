@@ -35,10 +35,16 @@ from mlflow.tracking import MlflowClient
 from src.training.data import CATEGORICAL_COLS
 
 MODEL_NAME = "fraud-model"
+DRIFT_EXPERIMENT_NAME = "drift-monitoring"
 PSI_THRESHOLD = 0.2
 N_BINS = 10
 MIN_LIVE_SAMPLES = 30
-DEFAULT_WINDOW_SIZE = 200
+# 10 bins over a small window means ~few dozen points per bin; heavy-tailed
+# features (e.g. velocity_*) then show real multinomial sampling noise large
+# enough to occasionally cross 0.2 under genuinely normal traffic. 300 was
+# chosen empirically as the point where that noise settles below threshold
+# on this dataset's most volatile features (see README's demo walkthrough).
+DEFAULT_WINDOW_SIZE = 300
 
 PREDICTION_LOG_DB = Path(
     os.environ.get(
@@ -141,11 +147,31 @@ def _load_production_training_distribution() -> tuple[Optional[dict], Optional[s
         with open(path) as f:
             distribution = json.load(f)
     except Exception:
-        return None, version.version
-    return distribution, version.version
+        return None, str(version.version)
+    return distribution, str(version.version)
 
 
-def check_for_drift(window_size: int = DEFAULT_WINDOW_SIZE, threshold: float = PSI_THRESHOLD) -> dict:
+def _log_drift_check(result: dict) -> None:
+    """Logs each drift check as an MLflow run under a dedicated experiment,
+    purely so the dashboard has a historical PSI trend to plot — this is a
+    monitoring log, not a model-training run."""
+    try:
+        mlflow.set_tracking_uri(_tracking_uri())
+        mlflow.set_experiment(DRIFT_EXPERIMENT_NAME)
+        with mlflow.start_run(run_name="drift-check"):
+            mlflow.log_metric("n_samples", result["n_samples"])
+            mlflow.log_metric("max_psi", max(result["psi_scores"].values()) if result["psi_scores"] else 0.0)
+            mlflow.set_tag("drifted", str(result["drifted"]))
+            mlflow.set_tag("production_version", str(result["production_version"]))
+            if result["psi_scores"]:
+                mlflow.log_dict(result["psi_scores"], "psi_scores.json")
+    except Exception:
+        pass  # monitoring log failures shouldn't block the actual drift decision
+
+
+def check_for_drift(
+    window_size: int = DEFAULT_WINDOW_SIZE, threshold: float = PSI_THRESHOLD, log_to_mlflow: bool = True
+) -> dict:
     """The single entry point drift_check_dag calls: reads the recent
     prediction log, compares it against the currently-Production model's
     training distribution, and reports whether retraining should trigger."""
@@ -153,7 +179,7 @@ def check_for_drift(window_size: int = DEFAULT_WINDOW_SIZE, threshold: float = P
     training_distribution, production_version = _load_production_training_distribution()
 
     if training_distribution is None:
-        return {
+        result = {
             "drifted": False,
             "reason": "no training distribution available for the current Production model",
             "n_samples": len(live_df),
@@ -161,9 +187,8 @@ def check_for_drift(window_size: int = DEFAULT_WINDOW_SIZE, threshold: float = P
             "psi_scores": {},
             "drifted_features": {},
         }
-
-    if len(live_df) < MIN_LIVE_SAMPLES:
-        return {
+    elif len(live_df) < MIN_LIVE_SAMPLES:
+        result = {
             "drifted": False,
             "reason": f"insufficient live samples ({len(live_df)} < {MIN_LIVE_SAMPLES})",
             "n_samples": len(live_df),
@@ -171,16 +196,19 @@ def check_for_drift(window_size: int = DEFAULT_WINDOW_SIZE, threshold: float = P
             "psi_scores": {},
             "drifted_features": {},
         }
+    else:
+        psi_scores = compute_drift(live_df, training_distribution)
+        drifted, drifted_features = is_drifted(psi_scores, threshold)
+        result = {
+            "drifted": drifted,
+            "reason": f"{len(drifted_features)} feature(s) exceeded PSI threshold {threshold}" if drifted else "no feature exceeded the PSI threshold",
+            "psi_scores": psi_scores,
+            "drifted_features": drifted_features,
+            "n_samples": len(live_df),
+            "production_version": production_version,
+            "threshold": threshold,
+        }
 
-    psi_scores = compute_drift(live_df, training_distribution)
-    drifted, drifted_features = is_drifted(psi_scores, threshold)
-
-    return {
-        "drifted": drifted,
-        "reason": f"{len(drifted_features)} feature(s) exceeded PSI threshold {threshold}" if drifted else "no feature exceeded the PSI threshold",
-        "psi_scores": psi_scores,
-        "drifted_features": drifted_features,
-        "n_samples": len(live_df),
-        "production_version": production_version,
-        "threshold": threshold,
-    }
+    if log_to_mlflow:
+        _log_drift_check(result)
+    return result

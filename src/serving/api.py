@@ -134,13 +134,14 @@ def reload_if_new_version() -> bool:
     if version is None:
         return False
 
+    new_version = str(version.version)
     _, current_version, _ = state.snapshot()
-    if version.version == current_version:
+    if new_version == current_version:
         return False
 
-    model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}/{version.version}")
+    model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}/{new_version}")
     feature_columns = _fetch_feature_columns(client, version.run_id)
-    state.update(model, version.version, feature_columns)
+    state.update(model, new_version, feature_columns)
     return True
 
 

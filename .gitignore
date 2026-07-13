@@ -20,6 +20,7 @@ mlflow.db
 mlflow_store/
 mlflow_server.log
 api_server.log
+dashboard.log
 
 # Pytest
 .pytest_cache/

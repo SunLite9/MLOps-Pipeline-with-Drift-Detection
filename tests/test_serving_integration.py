@@ -1,6 +1,7 @@
-"""Integration test for the serving API. Requires a reachable MLflow server
-(MLFLOW_TRACKING_URI, default http://127.0.0.1:5000) with a Production-stage
-`fraud-model` version already registered — see src/training/pipeline.py.
+"""Integration test for the serving API. Fully hermetic: the `mlflow_test_env`
+fixture (tests/conftest.py) points MLflow at a throwaway local file store and
+registers a synthetic Production model, so this runs the same in CI as it
+does locally — no live server or the real (uncommitted) dataset needed.
 """
 
 import sqlite3
@@ -44,7 +45,7 @@ SAMPLE_REQUEST = {
 
 
 @pytest.fixture(scope="module")
-def client():
+def client(mlflow_test_env):
     from src.serving.api import app
 
     with TestClient(app) as c:
